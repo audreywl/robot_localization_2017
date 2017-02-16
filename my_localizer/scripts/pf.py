@@ -173,9 +173,13 @@ class ParticleFilter:
             particle is selected in the resampling step.  You may want to make use of the given helper
             function draw_random_sample.
         """
+        probabilities = []
+        for part in self.particle_cloud:
+            probabilities.append(part.w)
+        new_samples = draw_random_sample(self.particle_cloud, probabilities)
         # make sure the distribution is normalized
-        self.normalize_particles()
-        # TODO: fill out the rest of the implementation
+        self.normalize_particles(new_samples)
+        self.particle_cloud = new_samples
 
     def update_particles_with_laser(self, msg):
         """ Updates the particle weights in response to the scan contained in the msg """
