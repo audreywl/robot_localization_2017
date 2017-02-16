@@ -43,7 +43,7 @@ class Particle(object):
             x: the x-coordinate of the hypothesis relative to the map frame
             y: the y-coordinate of the hypothesis relative ot the map frame
             theta: the yaw of the hypothesis relative to the map frame
-            w: the particle weight (the class does not ensure that particle weights are normalized """ 
+            w: the particle weight (the class does not ensure that particle weights are normalized """
         self.w = w
         self.theta = theta
         self.x = x
@@ -85,7 +85,7 @@ class ParticleFilter:
         self.base_frame = "base_link"   # the frame of the robot base
         self.map_frame = "map"          # the name of the map coordinate frame
         self.odom_frame = "odom"        # the name of the odometry coordinate frame
-        self.scan_topic = "scan"        # the topic where we will get laser scans from 
+        self.scan_topic = "scan"        # the topic where we will get laser scans from
 
         self.n_particles = 300          # the number of particles to use
 
@@ -115,11 +115,14 @@ class ParticleFilter:
         self.current_odom_xy_theta = []
 
         # request the map from the map server, the map should be of type nav_msgs/OccupancyGrid
-        # TODO: fill in the appropriate service call here.  The resultant map should be assigned be passed
-        #       into the init method for OccupancyField
-
+        rospy.wait_for_service('nav_msgs/GetMap')
+        handle_map = rospy.ServiceProxy('nav_msgs/GetMap', nav_msgs/OccupancyGrid)
+        try:
+            map_response = handle_map()
+            self.occupancy_field = OccupancyField(map_response)
+        except rospy.ServiceException, e:
+            print "Service call failed: %s"%e
         # for now we have commented out the occupancy field initialization until you can successfully fetch the map
-        #self.occupancy_field = OccupancyField(map)
         self.initialized = True
 
     def update_robot_pose(self):
@@ -220,7 +223,12 @@ class ParticleFilter:
         if xy_theta == None:
             xy_theta = convert_pose_to_xy_and_theta(self.odom_pose.pose)
         self.particle_cloud = []
-        # TODO create particles
+        for i in range(0:self.n_particles):
+            x = math.randint(0,100)*.1
+            y = math.randint(0,100)*.1
+            theta = math.randint(0,360)*2.0*math.pi/360.0
+            current_particle = Particle(x,y,theta)7
+            self.particle_cloud.append()
 
         self.normalize_particles()
         self.update_robot_pose()
@@ -293,7 +301,7 @@ class ParticleFilter:
         self.publish_particles(msg)
 
     def fix_map_to_odom_transform(self, msg):
-        """ This method constantly updates the offset of the map and 
+        """ This method constantly updates the offset of the map and
             odometry coordinate systems based on the latest results from
             the localizer
             TODO: if you want to learn a lot about tf, reimplement this... I can provide
