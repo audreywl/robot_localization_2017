@@ -21,6 +21,7 @@ from random import uniform
 import time
 
 import numpy as np
+import numpy.ma as ma
 from numpy.random import random_sample
 from sklearn.neighbors import NearestNeighbors
 from occupancy_field import OccupancyField
@@ -120,11 +121,11 @@ class ParticleFilter:
         self.current_odom_xy_theta = []
 
         # request the map from the map server, the map should be of type nav_msgs/OccupancyGrid
-        rospy.wait_for_service('nav_msgs/GetMap')
-        handle_map = rospy.ServiceProxy('nav_msgs/GetMap', nav_msgs/OccupancyGrid)
+        rospy.wait_for_service('/static_map')
+        handle_map = rospy.ServiceProxy('static_map', GetMap)
         try:
             map_response = handle_map()
-            self.occupancy_field = OccupancyField(map_response)
+            self.occupancy_field = OccupancyField(map_response.map)
         except rospy.ServiceException, e:
             print "Service call failed: %s"%e
         # for now we have commented out the occupancy field initialization until you can successfully fetch the map
@@ -194,8 +195,32 @@ class ParticleFilter:
 
     def update_particles_with_laser(self, msg):
         """ Updates the particle weights in response to the scan contained in the msg """
-        # TODO: implement this
-        pass
+        laser_view = np.zeroes((2,360))
+        laser_mask = np.zeroes((2,360))
+        new_weight = 0.0
+        for i in range(0,360):
+            dist = msg.ranges[i]
+            if dist == 0.0: #0.0 just means it reads nothing
+                laser_mask[:,i] = 1
+                continue
+            else:
+                x = dist*math.cos(math.pi*i/180.0)
+                y = dist*math.sin(math.pi*i/180.0)
+                laser_view[:,i] = [x,y]
+        laser_view_masked = ma.masked_array(laser_view,laser_mask)
+        for particle in self.particle_cloud:
+            current_rotation_matrix = np.array[[math.cos(particle.theta), -math.sin(particle.theta)],
+                                               [math.sin(particle.theta), math.cos(particle.theta)]]
+            laser_at_position = np.dot(current_rotation_matrix,laser_view_masked)
+            laser_at_position[0,:] += particle.x
+            laser_at_position[1,:] += particle.y
+            laser_at_position.flatten(order='F')
+            valid_data = laser_at_position.compressed()
+            for j in range(0,720,2): #this isn't gonna work...
+                x_data = valid_data[i]
+                y_data = valid_data[i+1]
+                new_weight += self.occupancy_field.get_closest_obstacle_distance(x_data, y_data)
+            particle.w *= new_weight
 
     @staticmethod
     def weighted_values(values, probabilities, size):
