@@ -17,6 +17,7 @@ from tf.transformations import euler_from_quaternion, rotation_matrix, quaternio
 from random import gauss
 
 import math
+from random import uniform
 import time
 
 import numpy as np
@@ -28,6 +29,9 @@ from helper_functions import (convert_pose_inverse_transform,
                               convert_translation_rotation_to_pose,
                               convert_pose_to_xy_and_theta,
                               angle_diff)
+
+from dynamic_reconfigure.server import Server
+#from cfg.conf.cfg import *
 
 class Particle(object):
     """ Represents a hypothesis (particle) of the robot's pose consisting of x,y and theta (yaw)
@@ -94,7 +98,8 @@ class ParticleFilter:
 
         self.laser_max_distance = 2.0   # maximum penalty to assess in the likelihood field model
 
-        # TODO: define additional constants if needed
+        self.min = 0
+        self.max = .2
 
         # Setup pubs and subs
 
@@ -160,6 +165,12 @@ class ParticleFilter:
             return
 
         # TODO: modify particles using delta
+        for particle in self.particle_cloud:
+            rand = uniform(self.min, self.max)
+            particle.x += delta[0] + rand
+            particle.y += delta[1] + rand
+            particle.theta += delta[2] + rand
+
         # For added difficulty: Implement sample_motion_odometry (Prob Rob p 136)
 
     def map_calc_range(self,x,y,theta):
@@ -227,11 +238,11 @@ class ParticleFilter:
         if xy_theta == None:
             xy_theta = convert_pose_to_xy_and_theta(self.odom_pose.pose)
         self.particle_cloud = []
-        for i in range(0:self.n_particles):
+        for i in range(0,self.n_particles):
             x = math.randint(0,100)*.1
             y = math.randint(0,100)*.1
             theta = math.randint(0,360)*2.0*math.pi/360.0
-            current_particle = Particle(x,y,theta)7
+            current_particle = Particle(x,y,theta)
             self.particle_cloud.append()
 
         self.normalize_particles()
