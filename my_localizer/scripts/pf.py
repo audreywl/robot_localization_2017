@@ -31,6 +31,12 @@ from helper_functions import (convert_pose_inverse_transform,
                               convert_pose_to_xy_and_theta,
                               angle_diff)
 
+<<<<<<< HEAD
+=======
+from dynamic_reconfigure.server import Server
+from pfconf.cfg import pfconfig
+
+>>>>>>> 8ee89bdf52b250bfdfb420dedaeb9b724ddfc1ca
 class Particle(object):
     """ Represents a hypothesis (particle) of the robot's pose consisting of x,y and theta (yaw)
         Attributes:
@@ -98,6 +104,9 @@ class ParticleFilter:
 
         # TODO: define additional constants if needed
 
+        # Setup config server
+        srv = Server(pfconfig, self.config_callback)
+
         # Setup pubs and subs
 
         # pose_listener responds to selection of a new approximate robot location (for instance using rviz)
@@ -126,6 +135,11 @@ class ParticleFilter:
             print "Service call failed: %s"%e
         # for now we have commented out the occupancy field initialization until you can successfully fetch the map
         self.initialized = True
+
+    def config_callback(self, config, level):
+        self.min = config.min
+        self.max = config.max
+        return config
 
     def update_robot_pose(self):
         """ Update the estimate of the robot's pose given the updated particles.
@@ -182,7 +196,7 @@ class ParticleFilter:
         # make sure the distribution is normalized
         self.normalize_particles(new_samples)
         self.particle_cloud = new_samples
-
+        
     def update_particles_with_laser(self, msg):
         """ Updates the particle weights in response to the scan contained in the msg """
         laser_view = np.zeros((2,360))
