@@ -31,12 +31,11 @@ from helper_functions import (convert_pose_inverse_transform,
                               convert_pose_to_xy_and_theta,
                               angle_diff)
 
-<<<<<<< HEAD
-=======
-from dynamic_reconfigure.server import Server
-from pfconf.cfg import pfconfig
 
->>>>>>> 8ee89bdf52b250bfdfb420dedaeb9b724ddfc1ca
+from dynamic_reconfigure.server import Server
+#from pfconf.cfg import pfconfig
+
+
 class Particle(object):
     """ Represents a hypothesis (particle) of the robot's pose consisting of x,y and theta (yaw)
         Attributes:
@@ -105,7 +104,7 @@ class ParticleFilter:
         # TODO: define additional constants if needed
 
         # Setup config server
-        srv = Server(pfconfig, self.config_callback)
+        #srv = Server(pfconfig, self.config_callback)
 
         # Setup pubs and subs
 
@@ -194,9 +193,10 @@ class ParticleFilter:
             probabilities.append(part.w)
         new_samples = self.draw_random_sample(self.particle_cloud, probabilities,self.n_particles)
         # make sure the distribution is normalized
-        self.normalize_particles(new_samples)
+
         self.particle_cloud = new_samples
-        
+        self.normalize_particles()
+
     def update_particles_with_laser(self, msg):
         """ Updates the particle weights in response to the scan contained in the msg """
         laser_view = np.zeros((2,360))
@@ -222,7 +222,9 @@ class ParticleFilter:
             for j in range(0,len(valid_data),2):
                 x_data = valid_data[i]
                 y_data = valid_data[i+1]
-                new_weight += self.occupancy_field.get_closest_obstacle_distance(x_data, y_data)
+                neighbor = self.occupancy_field.get_closest_obstacle_distance(x_data, y_data)
+                if not math.isnan(neighbor):
+                    new_weight += neighbor
             particle.w *= new_weight
 
     @staticmethod
