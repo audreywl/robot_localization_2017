@@ -31,11 +31,10 @@ from helper_functions import (convert_pose_inverse_transform,
                               convert_pose_to_xy_and_theta,
                               angle_diff)
 
-
 from dynamic_reconfigure.server import Server
-#from pfconf.cfg import pfconfig
 
-#from my_localizer.cfg import pfconfConfig
+from my_localizer.cfg import pfconfConfig
+
 
 class Particle(object):
     """ Represents a hypothesis (particle) of the robot's pose consisting of x,y and theta (yaw)
