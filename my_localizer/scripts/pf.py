@@ -32,7 +32,7 @@ from helper_functions import (convert_pose_inverse_transform,
                               angle_diff)
 
 from dynamic_reconfigure.server import Server
-#from cfg.conf.cfg import *
+from pfconf.cfg import pfconfig
 
 class Particle(object):
     """ Represents a hypothesis (particle) of the robot's pose consisting of x,y and theta (yaw)
@@ -102,6 +102,9 @@ class ParticleFilter:
         self.min = 0
         self.max = .2
 
+        # Setup config server
+        srv = Server(pfconfig, self.config_callback)
+
         # Setup pubs and subs
 
         # pose_listener responds to selection of a new approximate robot location (for instance using rviz)
@@ -130,6 +133,11 @@ class ParticleFilter:
             print "Service call failed: %s"%e
         # for now we have commented out the occupancy field initialization until you can successfully fetch the map
         self.initialized = True
+
+    def config_callback(self, config, level):
+        self.min = config.min
+        self.max = config.max
+        return config
 
     def update_robot_pose(self):
         """ Update the estimate of the robot's pose given the updated particles.
