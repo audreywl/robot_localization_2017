@@ -15,9 +15,9 @@ from tf import TransformListener
 from tf import TransformBroadcaster
 from tf.transformations import euler_from_quaternion, rotation_matrix, quaternion_from_matrix
 from random import gauss
+import random
 
 import math
-from random import uniform
 import time
 
 import numpy as np
@@ -31,9 +31,12 @@ from helper_functions import (convert_pose_inverse_transform,
                               convert_pose_to_xy_and_theta,
                               angle_diff)
 
+<<<<<<< HEAD
+=======
 from dynamic_reconfigure.server import Server
 from my_localizer.cfg import pfconfConfig
 
+>>>>>>> 8ee89bdf52b250bfdfb420dedaeb9b724ddfc1ca
 class Particle(object):
     """ Represents a hypothesis (particle) of the robot's pose consisting of x,y and theta (yaw)
         Attributes:
@@ -99,8 +102,7 @@ class ParticleFilter:
 
         self.laser_max_distance = 2.0   # maximum penalty to assess in the likelihood field model
 
-        self.min = 0
-        self.max = .2
+        # TODO: define additional constants if needed
 
         # Setup config server
         srv = Server(pfconfConfig, self.config_callback)
@@ -124,7 +126,7 @@ class ParticleFilter:
         self.current_odom_xy_theta = []
 
         # request the map from the map server, the map should be of type nav_msgs/OccupancyGrid
-        rospy.wait_for_service('/static_map')
+        rospy.wait_for_service('static_map')
         handle_map = rospy.ServiceProxy('static_map', GetMap)
         try:
             map_response = handle_map()
@@ -174,12 +176,6 @@ class ParticleFilter:
             return
 
         # TODO: modify particles using delta
-        for particle in self.particle_cloud:
-            rand = uniform(self.min, self.max)
-            particle.x += delta[0] + rand
-            particle.y += delta[1] + rand
-            particle.theta += delta[2] + rand
-
         # For added difficulty: Implement sample_motion_odometry (Prob Rob p 136)
 
     def map_calc_range(self,x,y,theta):
@@ -196,15 +192,15 @@ class ParticleFilter:
         probabilities = []
         for part in self.particle_cloud:
             probabilities.append(part.w)
-        new_samples = draw_random_sample(self.particle_cloud, probabilities)
+        new_samples = self.draw_random_sample(self.particle_cloud, probabilities,self.n_particles)
         # make sure the distribution is normalized
         self.normalize_particles(new_samples)
         self.particle_cloud = new_samples
-
+        
     def update_particles_with_laser(self, msg):
         """ Updates the particle weights in response to the scan contained in the msg """
-        laser_view = np.zeroes((2,360))
-        laser_mask = np.zeroes((2,360))
+        laser_view = np.zeros((2,360))
+        laser_mask = np.zeros((2,360))
         new_weight = 0.0
         for i in range(0,360):
             dist = msg.ranges[i]
@@ -217,14 +213,13 @@ class ParticleFilter:
                 laser_view[:,i] = [x,y]
         laser_view_masked = ma.masked_array(laser_view,laser_mask)
         for particle in self.particle_cloud:
-            current_rotation_matrix = np.array[[math.cos(particle.theta), -math.sin(particle.theta)],
-                                               [math.sin(particle.theta), math.cos(particle.theta)]]
+            current_rotation_matrix = np.array([[math.cos(particle.theta), -math.sin(particle.theta)],[math.sin(particle.theta), math.cos(particle.theta)]])
             laser_at_position = np.dot(current_rotation_matrix,laser_view_masked)
             laser_at_position[0,:] += particle.x
             laser_at_position[1,:] += particle.y
             laser_at_position.flatten(order='F')
             valid_data = laser_at_position.compressed()
-            for j in range(0,720,2): #this isn't gonna work...
+            for j in range(0,len(valid_data),2):
                 x_data = valid_data[i]
                 y_data = valid_data[i+1]
                 new_weight += self.occupancy_field.get_closest_obstacle_distance(x_data, y_data)
@@ -272,11 +267,11 @@ class ParticleFilter:
             xy_theta = convert_pose_to_xy_and_theta(self.odom_pose.pose)
         self.particle_cloud = []
         for i in range(0,self.n_particles):
-            x = math.randint(0,100)*.1
-            y = math.randint(0,100)*.1
-            theta = math.randint(0,360)*2.0*math.pi/360.0
+            x = random.randint(0,100)*.1
+            y = random.randint(0,100)*.1
+            theta = random.randint(0,360)*2.0*math.pi/360.0
             current_particle = Particle(x,y,theta)
-            self.particle_cloud.append()
+            self.particle_cloud.append(current_particle)
 
         self.normalize_particles()
         self.update_robot_pose()
@@ -354,6 +349,7 @@ class ParticleFilter:
             the localizer
             TODO: if you want to learn a lot about tf, reimplement this... I can provide
                   you with some hints as to what is going on here. """
+
         (translation, rotation) = convert_pose_inverse_transform(self.robot_pose)
         p = PoseStamped(pose=convert_translation_rotation_to_pose(translation,rotation),
                         header=Header(stamp=msg.header.stamp,frame_id=self.base_frame))
