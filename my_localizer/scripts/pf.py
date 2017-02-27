@@ -35,7 +35,7 @@ from helper_functions import (convert_pose_inverse_transform,
 from dynamic_reconfigure.server import Server
 #from pfconf.cfg import pfconfig
 
-from my_localizer.cfg import pfconfConfig
+#from my_localizer.cfg import pfconfConfig
 
 class Particle(object):
     """ Represents a hypothesis (particle) of the robot's pose consisting of x,y and theta (yaw)
@@ -106,7 +106,7 @@ class ParticleFilter:
 
         # Setup config server
 
-        srv = Server(pfconfConfig, self.config_callback)
+        #srv = Server(pfconfConfig, self.config_callback)
 
 
         # Setup pubs and subs
@@ -223,8 +223,8 @@ class ParticleFilter:
             laser_at_position.flatten(order='F')
             valid_data = laser_at_position.compressed()
             for j in range(0,len(valid_data),2):
-                x_data = valid_data[i]
-                y_data = valid_data[i+1]
+                x_data = valid_data[j]
+                y_data = valid_data[j+1]
                 neighbor = self.occupancy_field.get_closest_obstacle_distance(x_data, y_data)
                 if not math.isnan(neighbor):
                     new_weight += neighbor
