@@ -32,8 +32,8 @@ from helper_functions import (convert_pose_inverse_transform,
                               convert_pose_to_xy_and_theta,
                               angle_diff)
 
+# imports for the dynamic reconfigure
 from dynamic_reconfigure.server import Server
-
 from my_localizer.cfg import pfconfConfig
 
 
@@ -58,7 +58,9 @@ class Particle(object):
         self.y = y
 
     def as_pose(self):
-        """ A helper function to convert a particle to a geometry_msgs/Pose message """
+        """ A helper function to convert a particle to a geometry_msgs/Pose message
+            returns: A pose made from the point
+        """
         orientation_tuple = tf.transformations.quaternion_from_euler(0,0,self.theta)
         return Pose(position=Point(x=self.x,y=self.y,z=0), orientation=Quaternion(x=orientation_tuple[0], y=orientation_tuple[1], z=orientation_tuple[2], w=orientation_tuple[3]))
 
@@ -102,13 +104,12 @@ class ParticleFilter:
 
         self.laser_max_distance = 2.0   # maximum penalty to assess in the likelihood field model
         self.scan_counter = 0
-        self.translation_variance = 1
-        self.rotation_variance = 1
-        self.scan_frame = 2
+        self.translation_variance = 1   # variance for the translation distribution
+        self.rotation_variance = 1      # variance for the rotation distribution
+        self.scan_frame = 2             # updates the scan every n frames
 
-        # Setup config server
-        srv = Server(pfconfConfig, self.config_callback)
 
+        srv = Server(pfconfConfig, self.config_callback) # setup config server
 
         # Setup pubs and subs
 
@@ -124,6 +125,7 @@ class ParticleFilter:
         self.tf_listener = TransformListener()
         self.tf_broadcaster = TransformBroadcaster()
 
+        # array of particle objects
         self.particle_cloud = []
 
         self.current_odom_xy_theta = []
@@ -141,6 +143,9 @@ class ParticleFilter:
         print "init complete"
 
     def config_callback(self, config, level):
+        """ This is the callback for the dynamic reconfigure server
+            returns: the config
+        """
         self.translation_variance = config.translation_variance
         self.rotation_variance = config.rotation_variance
         self.scan_frame = config.scan_frame
