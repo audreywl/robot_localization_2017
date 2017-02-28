@@ -146,7 +146,6 @@ class ParticleFilter:
         """ This is the callback for the dynamic reconfigure server
             returns: the config
         """
-        self.n_particles = config.n_particles
         self.translation_variance = config.translation_variance
         self.rotation_variance = config.rotation_variance
         self.scan_frame = config.scan_frame
@@ -190,12 +189,11 @@ class ParticleFilter:
             delta = (new_odom_xy_theta[0] - self.current_odom_xy_theta[0],
                      new_odom_xy_theta[1] - self.current_odom_xy_theta[1],
                      new_odom_xy_theta[2] - self.current_odom_xy_theta[2])
-            #self.current_odom_xy_theta = new_odom_xy_theta
+            self.current_odom_xy_theta = new_odom_xy_theta
         else:
-            #self.current_odom_xy_theta = new_odom_xy_theta
+            self.current_odom_xy_theta = new_odom_xy_theta
             return
 
-        # adding random noise to the x, y, and theta of the particles
         for particle in self.particle_cloud:
             particle.x += delta[0] + random.uniform(-.2,.2)
             particle.y += delta[1] + random.uniform(-.2,.2)
@@ -214,60 +212,55 @@ class ParticleFilter:
             particle is selected in the resampling step.  You may want to make use of the given helper
             function draw_random_sample.
         """
-        # create a list of probabilities, add to it, and take random samples from it
         probabilities = []
-        for particle in self.particle_cloud:
-            probabilities.append(particle.w)
-        new_samples = self.draw_random_sample(self.particle_cloud, probabilities, self.n_particles)
-
-        # update the particles from the random sample
-        self.particle_cloud = new_samples
+        for part in self.particle_cloud:
+            probabilities.append(part.w)
+        new_samples = self.draw_random_sample(self.particle_cloud, probabilities,self.n_particles)
         # make sure the distribution is normalized
+
+        self.particle_cloud = new_samples
         self.normalize_particles()
 
     def update_particles_with_laser(self, msg):
-        """ Updates the particle weights in response to the scan contained in the msg 
-            msg: a laser scan
-        """
-        # only update every n frames
+        """ Updates the particle weights in response to the scan contained in the msg """
+        #drops some scans to increase processing speed
         self.scan_counter += 1
         if self.scan_counter%self.scan_frame:
             #print 'ignoring scan'
             return
-        #print 'processing scan'
-
-        # create 2 zeroed numpy arrays to filter out useless data
+        #create np representation of laser data
         laser_view = np.zeros((2,360))
         laser_mask = np.zeros((2,360))
-
-        # filter out the scan if it sees nothing
         new_weight = 0.0
         for i in range(0,360):
             dist = msg.ranges[i]
             if dist == 0.0: #0.0 just means it reads nothing
-                laser_mask[:,i] = 1
+                laser_mask[:,i] = 1 #if the scan reads nothing, invalidate the location data using the mask
                 continue
             else:
+                #record coordinates of scanned values
                 x = dist*math.cos(math.pi*i/180.0)
                 y = dist*math.sin(math.pi*i/180.0)
                 laser_view[:,i] = [x,y]
         laser_view_masked = ma.masked_array(laser_view,laser_mask)
-
-        # Updating the weights of the particles
+        #translate and rotate the laser data to fit particles
         for particle in self.particle_cloud:
+            #rotate
             current_rotation_matrix = np.array([[math.cos(particle.theta), -math.sin(particle.theta)],[math.sin(particle.theta), math.cos(particle.theta)]])
             laser_at_position = np.dot(current_rotation_matrix,laser_view_masked)
+            #translate
             laser_at_position[0,:] += particle.x
             laser_at_position[1,:] += particle.y
-            laser_at_position.flatten(order='F')
-            valid_data = laser_at_position.compressed()
+            laser_at_position.flatten(order='F') #make a 1D array with x and y alternating
+            valid_data = laser_at_position.compressed() #remove invalid data from array (this only works in 1D which is why we had to flatten)
+            #figure out how close the laser scan is to correct w/ map
             for j in range(0,len(valid_data),2):
                 x_data = valid_data[j]
                 y_data = valid_data[j+1]
                 neighbor = self.occupancy_field.get_closest_obstacle_distance(x_data, y_data)
                 if not math.isnan(neighbor):
                     new_weight += neighbor
-            particle.w *= new_weight
+            particle.w *= new_weight #since the new weight isn't normalized yet, we have multiply it by the old, and normalize later
 
     @staticmethod
     def weighted_values(values, probabilities, size):
@@ -311,9 +304,8 @@ class ParticleFilter:
             xy_theta = convert_pose_to_xy_and_theta(self.odom_pose.pose)
         self.particle_cloud = []
         for i in range(0,self.n_particles):
-            #x = random.randint(0,100)*.1
-            #y = random.randint(0,100)*.1
-            #theta = random.randint(0,360)*2.0*math.pi/360.0
+            #Generate new particles in gaussian around current estimate
+            #translation and rotation variances are dynam configured
             x = random.gauss(xy_theta[0], self.translation_variance)
             y = random.gauss(xy_theta[1], self.translation_variance)
             theta = random.gauss(xy_theta[2], self.rotation_variance)
