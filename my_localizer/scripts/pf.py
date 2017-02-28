@@ -16,6 +16,7 @@ from tf import TransformBroadcaster
 from tf.transformations import euler_from_quaternion, rotation_matrix, quaternion_from_matrix
 from random import gauss
 import random
+from scipy import stats
 
 import math
 import time
@@ -100,6 +101,10 @@ class ParticleFilter:
         self.a_thresh = math.pi/6       # the amount of angular movement before performing an update
 
         self.laser_max_distance = 2.0   # maximum penalty to assess in the likelihood field model
+        self.scan_counter = 0
+        self.translation_variance = 1
+        self.rotation_variance = 1
+        self.scan_frame = 2
 
         # Setup config server
         srv = Server(pfconfConfig, self.config_callback)
@@ -133,6 +138,7 @@ class ParticleFilter:
             print "Service call failed: %s"%e
         # for now we have commented out the occupancy field initialization until you can successfully fetch the map
         self.initialized = True
+        print "init complete"
 
     def config_callback(self, config, level):
         self.translation_variance = config.translation_variance
@@ -148,10 +154,20 @@ class ParticleFilter:
         """
         # first make sure that the particle weights are normalized
         self.normalize_particles()
+        positions = np.zeros((3,self.n_particles))
+        weights = np.zeros(self.n_particles)
+        #assign the lastest pose into self.robot_pose as a geometry_msgs.Pose object
+        for i in range(0,self.n_particles):
+            positions[:,i] = (self.particle_cloud[i].x, self.particle_cloud[i].y, self.particle_cloud[i].theta)
+            weights[i] = self.particle_cloud[i].w
+        mean = np.average(positions, weights=weights, axis=1)
 
-        # TODO: assign the lastest pose into self.robot_pose as a geometry_msgs.Pose object
+        orientation_tuple = tf.transformations.quaternion_from_euler(0,0,mean[2])
+        self.robot_pose = Pose(position=Point(x=mean[0],y=mean[1],z=0), orientation=Quaternion(x=orientation_tuple[0], y=orientation_tuple[1], z=orientation_tuple[2], w=orientation_tuple[3]))
+        #print "updating robot_pose to"
+        #print mean
         # just to get started we will fix the robot's pose to always be at the origin
-        self.robot_pose = Pose()
+        #self.robot_pose = Pose()
 
     def update_particles_with_odom(self, msg):
         """ Update the particles using the newly given odometry pose.
@@ -168,14 +184,17 @@ class ParticleFilter:
             delta = (new_odom_xy_theta[0] - self.current_odom_xy_theta[0],
                      new_odom_xy_theta[1] - self.current_odom_xy_theta[1],
                      new_odom_xy_theta[2] - self.current_odom_xy_theta[2])
-
             self.current_odom_xy_theta = new_odom_xy_theta
         else:
             self.current_odom_xy_theta = new_odom_xy_theta
             return
 
-        # TODO: modify particles using delta
+        for particle in self.particle_cloud:
+            particle.x += delta[0] + random.uniform(-.2,.2)
+            particle.y += delta[1] + random.uniform(-.2,.2)
+            particle.theta += delta[2] + random.uniform(-math.pi/2,math.pi/2)
         # For added difficulty: Implement sample_motion_odometry (Prob Rob p 136)
+        #print "updating move"
 
     def map_calc_range(self,x,y,theta):
         """ Difficulty Level 3: implement a ray tracing likelihood model... Let me know if you are interested """
@@ -199,6 +218,11 @@ class ParticleFilter:
 
     def update_particles_with_laser(self, msg):
         """ Updates the particle weights in response to the scan contained in the msg """
+        self.scan_counter += 1
+        if self.scan_counter%self.scan_frame:
+            #print 'ignoring scan'
+            return
+        #print 'processing scan'
         laser_view = np.zeros((2,360))
         laser_mask = np.zeros((2,360))
         new_weight = 0.0
@@ -269,14 +293,18 @@ class ParticleFilter:
             xy_theta = convert_pose_to_xy_and_theta(self.odom_pose.pose)
         self.particle_cloud = []
         for i in range(0,self.n_particles):
-            x = random.randint(0,100)*.1
-            y = random.randint(0,100)*.1
-            theta = random.randint(0,360)*2.0*math.pi/360.0
+            #x = random.randint(0,100)*.1
+            #y = random.randint(0,100)*.1
+            #theta = random.randint(0,360)*2.0*math.pi/360.0
+            x = random.gauss(xy_theta[0], self.translation_variance)
+            y = random.gauss(xy_theta[1], self.translation_variance)
+            theta = random.gauss(xy_theta[2], self.rotation_variance)
             current_particle = Particle(x,y,theta)
             self.particle_cloud.append(current_particle)
 
         self.normalize_particles()
         self.update_robot_pose()
+        print "particle cloud initialized"
 
     def normalize_particles(self):
         """ Make sure the particle weights define a valid distribution (i.e. sum to 1.0) """
@@ -299,18 +327,22 @@ class ParticleFilter:
         """ This is the default logic for what to do when processing scan data.
             Feel free to modify this, however, I hope it will provide a good
             guide.  The input msg is an object of type sensor_msgs/LaserScan """
+
         if not(self.initialized):
             # wait for initialization to complete
+            #print "Node not initialized"
             return
 
         if not(self.tf_listener.canTransform(self.base_frame,msg.header.frame_id,msg.header.stamp)):
             # need to know how to transform the laser to the base frame
             # this will be given by either Gazebo or neato_node
+            print "cannot transform laser to base frame"
             return
 
         if not(self.tf_listener.canTransform(self.base_frame,self.odom_frame,msg.header.stamp)):
             # need to know how to transform between base and odometric frames
             # this will eventually be published by either Gazebo or neato_node
+            print "cannot transform laser to odom frame"
             return
 
         # calculate pose of laser relative ot the robot base
