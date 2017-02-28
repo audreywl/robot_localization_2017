@@ -1,2 +1,16 @@
-# robot_localization_2017
-This is the base repo for the robot  localization assignment in CompRobo, spring 2017.
+# Robot Localization 2017
+## Audrey Lewis and Carl Moser
+
+## Our goal
+
+## Our solution
+
+![]()
+
+## Design decision
+
+## Challenges
+
+## Improvments
+
+## Lessons learned
