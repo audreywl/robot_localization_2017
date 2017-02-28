@@ -195,9 +195,9 @@ class ParticleFilter:
             return
 
         for particle in self.particle_cloud:
-            particle.x += delta[0] + random.uniform(-.2,.2)
-            particle.y += delta[1] + random.uniform(-.2,.2)
-            particle.theta += delta[2] + random.uniform(-math.pi/2,math.pi/2)
+            particle.x += delta[0] + random.uniform(-self.translation_variance,self.translation_variance)
+            particle.y += delta[1] + random.uniform(-self.translation_variance,self.translation_variance)
+            particle.theta += delta[2] + random.uniform(-self.rotation_variance,self.rotation_variance)
         # For added difficulty: Implement sample_motion_odometry (Prob Rob p 136)
         #print "updating move"
 
