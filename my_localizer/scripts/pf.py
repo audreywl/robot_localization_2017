@@ -146,6 +146,7 @@ class ParticleFilter:
         """ This is the callback for the dynamic reconfigure server
             returns: the config
         """
+        self.n_particles = config.n_particles
         self.translation_variance = config.translation_variance
         self.rotation_variance = config.rotation_variance
         self.scan_frame = config.scan_frame
@@ -194,6 +195,7 @@ class ParticleFilter:
             #self.current_odom_xy_theta = new_odom_xy_theta
             return
 
+        # adding random noise to the x, y, and theta of the particles
         for particle in self.particle_cloud:
             particle.x += delta[0] + random.uniform(-.2,.2)
             particle.y += delta[1] + random.uniform(-.2,.2)
@@ -212,24 +214,33 @@ class ParticleFilter:
             particle is selected in the resampling step.  You may want to make use of the given helper
             function draw_random_sample.
         """
+        # create a list of probabilities, add to it, and take random samples from it
         probabilities = []
-        for part in self.particle_cloud:
-            probabilities.append(part.w)
-        new_samples = self.draw_random_sample(self.particle_cloud, probabilities,self.n_particles)
-        # make sure the distribution is normalized
+        for particle in self.particle_cloud:
+            probabilities.append(particle.w)
+        new_samples = self.draw_random_sample(self.particle_cloud, probabilities, self.n_particles)
 
+        # update the particles from the random sample
         self.particle_cloud = new_samples
+        # make sure the distribution is normalized
         self.normalize_particles()
 
     def update_particles_with_laser(self, msg):
-        """ Updates the particle weights in response to the scan contained in the msg """
+        """ Updates the particle weights in response to the scan contained in the msg 
+            msg: a laser scan
+        """
+        # only update every n frames
         self.scan_counter += 1
         if self.scan_counter%self.scan_frame:
             #print 'ignoring scan'
             return
         #print 'processing scan'
+
+        # create 2 zeroed numpy arrays to filter out useless data
         laser_view = np.zeros((2,360))
         laser_mask = np.zeros((2,360))
+
+        # filter out the scan if it sees nothing
         new_weight = 0.0
         for i in range(0,360):
             dist = msg.ranges[i]
@@ -241,6 +252,8 @@ class ParticleFilter:
                 y = dist*math.sin(math.pi*i/180.0)
                 laser_view[:,i] = [x,y]
         laser_view_masked = ma.masked_array(laser_view,laser_mask)
+
+        # Updating the weights of the particles
         for particle in self.particle_cloud:
             current_rotation_matrix = np.array([[math.cos(particle.theta), -math.sin(particle.theta)],[math.sin(particle.theta), math.cos(particle.theta)]])
             laser_at_position = np.dot(current_rotation_matrix,laser_view_masked)
