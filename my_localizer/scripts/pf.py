@@ -101,11 +101,8 @@ class ParticleFilter:
 
         self.laser_max_distance = 2.0   # maximum penalty to assess in the likelihood field model
 
-        # TODO: define additional constants if needed
-
         # Setup config server
-
-        #srv = Server(pfconfConfig, self.config_callback)
+        srv = Server(pfconfConfig, self.config_callback)
 
 
         # Setup pubs and subs
@@ -138,8 +135,9 @@ class ParticleFilter:
         self.initialized = True
 
     def config_callback(self, config, level):
-        self.min = config.min
-        self.max = config.max
+        self.translation_variance = config.translation_variance
+        self.rotation_variance = config.rotation_variance
+        self.scan_frame = config.scan_frame
         return config
 
     def update_robot_pose(self):
