@@ -117,6 +117,8 @@ class ParticleFilter:
         self.pose_listener = rospy.Subscriber("initialpose", PoseWithCovarianceStamped, self.update_initial_pose)
         # publish the current particle cloud.  This enables viewing particles in rviz.
         self.particle_pub = rospy.Publisher("particlecloud", PoseArray, queue_size=10)
+        #publish robot position
+        self.robot_pub = rospy.Publisher("robotposeguess", PoseStamped, queue_size=10)
 
         # laser_subscriber listens for data from the lidar
         self.laser_subscriber = rospy.Subscriber(self.scan_topic, LaserScan, self.scan_received)
@@ -169,8 +171,8 @@ class ParticleFilter:
 
         orientation_tuple = tf.transformations.quaternion_from_euler(0,0,mean[2])
         self.robot_pose = Pose(position=Point(x=mean[0],y=mean[1],z=0), orientation=Quaternion(x=orientation_tuple[0], y=orientation_tuple[1], z=orientation_tuple[2], w=orientation_tuple[3]))
-        #print "updating robot_pose to"
-        #print mean
+        print "updating robot_pose to"
+        print mean
         # just to get started we will fix the robot's pose to always be at the origin
         #self.robot_pose = Pose()
 
@@ -352,7 +354,7 @@ class ParticleFilter:
         if not(self.tf_listener.canTransform(self.base_frame,self.odom_frame,msg.header.stamp)):
             # need to know how to transform between base and odometric frames
             # this will eventually be published by either Gazebo or neato_node
-            print "cannot transform laser to odom frame"
+            print "cannot transform base to odom frame"
             return
 
         # calculate pose of laser relative ot the robot base
@@ -386,6 +388,9 @@ class ParticleFilter:
             self.fix_map_to_odom_transform(msg)     # update map to odom transform now that we have new particles
         # publish particles (so things like rviz can see them)
         self.publish_particles(msg)
+        self.robot_pub.publish(PoseStamped(header=Header(stamp=rospy.Time.now(),
+                                            frame_id=self.map_frame),
+                                  pose=self.robot_pose))
 
     def fix_map_to_odom_transform(self, msg):
         """ This method constantly updates the offset of the map and
@@ -393,6 +398,8 @@ class ParticleFilter:
             the localizer
             TODO: if you want to learn a lot about tf, reimplement this... I can provide
                   you with some hints as to what is going on here. """
+
+        print "fixing transform"
 
         (translation, rotation) = convert_pose_inverse_transform(self.robot_pose)
         p = PoseStamped(pose=convert_translation_rotation_to_pose(translation,rotation),
@@ -419,5 +426,8 @@ if __name__ == '__main__':
 
     while not(rospy.is_shutdown()):
         # in the main loop all we do is continuously broadcast the latest map to odom transform
-        n.broadcast_last_transform()
-        r.sleep()
+        try:
+            n.broadcast_last_transform()
+            r.sleep()
+        except rospy.exceptions.ROSTimeMovedBackwardsException as e:
+            n.initialize_particle_cloud() #reinitialize if the bag restarts
